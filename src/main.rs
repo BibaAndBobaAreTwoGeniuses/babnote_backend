@@ -1,8 +1,14 @@
 use axum::{extract::{DefaultBodyLimit, Multipart, Query}, http::{header::{CONTENT_DISPOSITION, CONTENT_TYPE}, HeaderMap, HeaderValue, StatusCode}, response::IntoResponse, routing::{get, post}, Router};
 
+mod controllers;
+mod managers;
+mod crypt;
+
+use controllers::{auth_controller, note_controller};
 use serde::Deserialize;
+use sqlx::{pool::PoolOptions, MySql};
 use tokio::io::AsyncReadExt;
-use std::{fs::{File, OpenOptions}, io::Write};
+use std::{fs::{File, OpenOptions}, io::Write, time::Duration};
 
 #[derive(Deserialize)]
 struct User {
@@ -13,64 +19,28 @@ struct User {
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let con_str = "mysql://klewy:root@localhost:3306/babnote";
+
+    let pool = sqlx::mysql::MySqlPoolOptions::new()
+    .max_connections(10)
+    .acquire_timeout(Duration::from_secs(5))
+    .connect(&con_str)
+    .await
+    .expect("Cant connect fuck it");
+
+  
+    println!("Connected");
+
+    
+
     let app = Router::new()
-    .route("/upload", post(upload))
-    .route("/download", get(download))
-    .layer(DefaultBodyLimit::max(100000));
+    .route("/upload", post(note_controller::upload))
+    .route("/download", get(note_controller::download))
+    .route("/register", post(auth_controller::register_user))
+    .layer(DefaultBodyLimit::max(100000))
+    .with_state(pool);
 
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-
-async fn upload(mut multipart: Multipart) -> Result<impl IntoResponse, (StatusCode, String)> {
-    println!("here");
-    while let Some(mut field) = multipart.next_field().await.unwrap() {
-        let dir_name = field.name().unwrap().to_string();
-        let file_name = field.file_name().unwrap().to_string();
-        let data: axum::body::Bytes = field.bytes().await.unwrap();
-
-        match upload_file(&dir_name, &file_name, data) {
-            Ok(_) => {
-                println!("success");
-            },
-            Err(why) => {
-                eprintln!("gademn {}", why);
-                return Err((StatusCode::BAD_REQUEST, why.to_string()))
-            }
-        }
-    }
-    Ok(())
-}
-
-#[axum::debug_handler]
-async fn download(Query(username) : Query<User>) -> Result<impl IntoResponse, (StatusCode, String)> {
-    println!("{}", username.username.clone() + "/babnote.sqlite");
-    let mut file = match tokio::fs::File::open(username.username.clone() + "/babnote.sqlite").await {
-        Ok(file) => file,
-        Err(why) => {
-            return Err((StatusCode::NOT_FOUND, why.to_string()))
-        }
-    };
-    
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).await.unwrap();
-
-    let mut headers = HeaderMap::new();
-    headers.append(CONTENT_TYPE, HeaderValue::from_str("application/vnd.sqlite3").unwrap());
-    headers.append(CONTENT_DISPOSITION, HeaderValue::from_str(format!("form-data; name=\"{}\"; filename=\"babnote.sqlite\"", username.username).as_str()).unwrap());
-
-    Ok((headers, buf))
-}
-
-fn upload_file(dir_name: &str, file_name: &str, data: axum::body::Bytes) -> Result<(), Box<dyn std::error::Error>> {
-    let path = std::path::Path::new(dir_name);
-    if !path.exists() {
-        std::fs::create_dir(dir_name)?
-    }
-    let full_path = dir_name.to_string() + "/" + file_name;
-    let mut file = OpenOptions::new().create(true).write(true).truncate(true).open(full_path)?;
-    file.write(&data).unwrap();
-    Ok(())
 }
