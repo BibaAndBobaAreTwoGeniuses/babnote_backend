@@ -1,2 +1,3 @@
-pub mod note_controller;
-pub mod auth_controller;
+pub mod note;
+pub mod auth;
+pub mod structs;

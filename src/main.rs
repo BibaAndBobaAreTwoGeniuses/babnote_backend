@@ -4,16 +4,12 @@ mod controllers;
 mod managers;
 mod crypt;
 
-use controllers::{auth_controller, note_controller};
+use controllers::{auth, note};
 use serde::Deserialize;
 use sqlx::{pool::PoolOptions, MySql};
 use tokio::io::AsyncReadExt;
 use std::{fs::{File, OpenOptions}, io::Write, time::Duration};
 
-#[derive(Deserialize)]
-struct User {
-    username: String
-}
 
 #[tokio::main]
 async fn main() {
@@ -34,9 +30,10 @@ async fn main() {
     
 
     let app = Router::new()
-    .route("/upload", post(note_controller::upload))
-    .route("/download", get(note_controller::download))
-    .route("/register", post(auth_controller::register_user))
+    .route("/upload", post(note::upload))
+    .route("/download", get(note::download))
+    .route("/register", post(auth::register_user))
+    .route("/login", post(auth::login_user))
     .layer(DefaultBodyLimit::max(100000))
     .with_state(pool);
 
