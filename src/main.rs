@@ -5,10 +5,11 @@ mod managers;
 mod crypt;
 
 use controllers::{auth, note};
+use crypt::token;
 use serde::Deserialize;
 use sqlx::{pool::PoolOptions, MySql};
-use tokio::io::AsyncReadExt;
-use std::{fs::{File, OpenOptions}, io::Write, time::Duration};
+use tokio::{io::{AsyncBufReadExt, AsyncReadExt, BufReader}, net::TcpListener};
+use std::{fs::{File, OpenOptions}, io::Write, thread::sleep, time::Duration};
 
 
 #[tokio::main]
@@ -34,10 +35,11 @@ async fn main() {
     .route("/download", get(note::download))
     .route("/register", post(auth::register_user))
     .route("/login", post(auth::login_user))
-    .layer(DefaultBodyLimit::max(100000))
+    .layer(DefaultBodyLimit::max(1 * 1024 * 1024 * 1024 * 2))
     .with_state(pool);
 
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+
 }

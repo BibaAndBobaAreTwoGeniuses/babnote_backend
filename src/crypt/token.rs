@@ -22,7 +22,7 @@ pub fn verify_token(token: &str) -> anyhow::Result<u32> {
     let claims: BTreeMap<String, u32> = match token.verify_with_key(&key) {
         Ok(claims) => claims,
         Err(why) => {
-            eprintln!("{}", why);
+            eprintln!("COck {}", why);
             return Err(why.into())
         }
     };

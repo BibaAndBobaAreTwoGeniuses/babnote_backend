@@ -56,6 +56,6 @@ pub async fn login_user(State(pool): State<MySqlPool>, Json(userdata): Json<Logi
     }
 
     let token = token::make_token(user_id);
-
+    println!("log succes");
     Ok(Json(ResponseAuthOk::new(token)))
 }
